@@ -1,0 +1,995 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SQLab Pro - 开源 SQL 测试工作台</title>
+<style>
+/* ========== 设计变量（暗色主题） ========== */
+:root{
+  --bg:#0d1117;
+  --bg2:#161b22;
+  --bg3:#1c2129;
+  --ink:#e6edf3;
+  --muted:#8b949e;
+  --rule:#30363d;
+  --accent:#58a6ff;
+  --accent2:#bc8cff;
+  --grad:linear-gradient(135deg,#2f81f7 0%,#8957e5 100%);
+  --ok:#3fb950;
+  --warn:#d29922;
+  --err:#f85149;
+  --info:#58a6ff;
+  --mono:'JetBrains Mono','Fira Code','Cascadia Code',Consolas,'Courier New',monospace;
+  --sans:-apple-system,'Segoe UI','PingFang SC','Microsoft YaHei','Noto Sans SC',sans-serif;
+  --shadow:0 8px 24px rgba(1,4,9,.55);
+  --radius:12px;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%}
+body{
+  font-family:var(--sans);
+  background:var(--bg);
+  color:var(--ink);
+  font-size:14px;
+  line-height:1.6;
+  overflow:hidden;
+}
+::-webkit-scrollbar{width:10px;height:10px}
+::-webkit-scrollbar-thumb{background:#3d444d;border-radius:6px;border:2px solid var(--bg)}
+::-webkit-scrollbar-track{background:transparent}
+
+/* ========== 整体布局 ========== */
+.app{display:flex;height:100vh}
+
+/* ---------- 侧边栏 ---------- */
+.sidebar{
+  width:232px;flex-shrink:0;
+  background:var(--bg2);
+  border-right:1px solid var(--rule);
+  display:flex;flex-direction:column;
+}
+.logo{
+  display:flex;align-items:center;gap:10px;
+  padding:20px 20px 18px;
+  border-bottom:1px solid var(--rule);
+}
+.logo-icon{
+  width:36px;height:36px;border-radius:10px;
+  background:var(--grad);
+  display:flex;align-items:center;justify-content:center;
+  font-family:var(--mono);font-weight:700;font-size:15px;color:#fff;
+  box-shadow:0 4px 12px rgba(89,88,233,.35);
+}
+.logo-text{font-size:17px;font-weight:700;letter-spacing:.3px}
+.logo-text em{font-style:normal;background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
+.logo-sub{font-size:10.5px;color:var(--muted);letter-spacing:1.5px;margin-top:-2px}
+
+.menu{padding:14px 12px;flex:1}
+.menu-label{font-size:11px;color:var(--muted);letter-spacing:2px;padding:4px 10px 8px}
+.menu-item{
+  display:flex;align-items:center;gap:11px;
+  padding:10px 12px;border-radius:9px;
+  color:var(--muted);cursor:pointer;
+  margin-bottom:4px;
+  transition:background .18s,color .18s,transform .12s;
+  user-select:none;position:relative;
+}
+.menu-item:hover{background:var(--bg3);color:var(--ink)}
+.menu-item:active{transform:scale(.98)}
+.menu-item.active{background:linear-gradient(90deg,rgba(88,166,255,.16),rgba(188,140,255,.08));color:#fff}
+.menu-item.active::before{
+  content:'';position:absolute;left:0;top:22%;height:56%;width:3px;
+  background:var(--grad);border-radius:3px;
+}
+.menu-item svg{width:17px;height:17px;flex-shrink:0}
+.menu-item .kbd{
+  margin-left:auto;font-family:var(--mono);font-size:10px;
+  background:var(--bg3);border:1px solid var(--rule);border-radius:5px;
+  padding:1px 6px;color:var(--muted);
+}
+.menu-item.active .kbd{color:var(--accent);border-color:rgba(88,166,255,.4)}
+
+.conn{
+  margin:12px;padding:12px 14px;border-radius:10px;
+  background:var(--bg3);border:1px solid var(--rule);
+  font-size:12px;
+}
+.conn-row{display:flex;align-items:center;gap:7px;margin-bottom:6px}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--ok);box-shadow:0 0 8px rgba(63,185,80,.8);animation:pulse 2s infinite}
+@keyframes pulse{50%{opacity:.45}}
+.conn b{font-size:12.5px}
+.conn span{display:block;color:var(--muted);font-size:11.5px}
+.conn .tag{display:inline-block;margin-top:6px;font-family:var(--mono);font-size:10px;color:#7ee787;background:rgba(63,185,80,.12);border:1px solid rgba(63,185,80,.3);padding:1px 7px;border-radius:20px}
+
+/* ---------- 主区域 ---------- */
+.main{flex:1;display:flex;flex-direction:column;min-width:0}
+.topbar{
+  height:58px;flex-shrink:0;
+  display:flex;align-items:center;gap:14px;
+  padding:0 24px;
+  border-bottom:1px solid var(--rule);
+  background:rgba(13,17,23,.85);backdrop-filter:blur(8px);
+}
+.crumb{font-size:12.5px;color:var(--muted)}
+.crumb b{color:var(--ink);font-weight:600;font-size:14.5px;margin-left:8px}
+.topbar-right{margin-left:auto;display:flex;align-items:center;gap:14px}
+.pill{
+  display:inline-flex;align-items:center;gap:6px;
+  font-size:12px;color:var(--muted);
+  border:1px solid var(--rule);border-radius:20px;padding:4px 12px;
+  background:var(--bg2);
+}
+.avatar{
+  width:30px;height:30px;border-radius:50%;
+  background:linear-gradient(135deg,#f778ba,#8957e5);
+  display:flex;align-items:center;justify-content:center;
+  font-size:12px;font-weight:700;color:#fff;cursor:pointer;
+}
+
+.content{flex:1;overflow-y:auto;padding:22px 24px 40px;position:relative}
+
+/* ---------- 视图切换动画 ---------- */
+.view{display:none;max-width:1180px;margin:0 auto}
+.view.active{display:block;animation:fadeUp .32s cubic-bezier(.2,.7,.3,1)}
+@keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+
+/* ========== 通用组件 ========== */
+.card{
+  background:var(--bg2);
+  border:1px solid var(--rule);
+  border-radius:var(--radius);
+  overflow:hidden;
+}
+.card + .card{margin-top:16px}
+.card-head{
+  display:flex;align-items:center;gap:10px;
+  padding:13px 18px;border-bottom:1px solid var(--rule);
+}
+.card-head h3{font-size:14.5px;font-weight:600}
+.card-head .sub{font-size:12px;color:var(--muted)}
+.card-head .spacer{flex:1}
+.card-body{padding:18px}
+
+.btn{
+  display:inline-flex;align-items:center;gap:7px;
+  border:1px solid var(--rule);border-radius:8px;
+  background:var(--bg3);color:var(--ink);
+  font-family:var(--sans);font-size:13px;font-weight:500;
+  padding:7px 14px;cursor:pointer;
+  transition:transform .12s,box-shadow .18s,border-color .18s,filter .18s;
+  white-space:nowrap;user-select:none;
+}
+.btn:hover{border-color:#4d545d;filter:brightness(1.12)}
+.btn:active{transform:scale(.96)}
+.btn svg{width:14px;height:14px}
+.btn-primary{
+  background:var(--grad);border:none;color:#fff;
+  box-shadow:0 4px 14px rgba(89,88,233,.35);
+  font-weight:600;
+}
+.btn-primary:hover{box-shadow:0 6px 20px rgba(89,88,233,.5);filter:brightness(1.08)}
+.btn-ghost{background:transparent}
+.btn-danger{color:#ff8182;border-color:rgba(248,81,73,.4)}
+.btn-danger:hover{background:rgba(248,81,73,.12)}
+.btn:disabled{opacity:.55;cursor:not-allowed;transform:none}
+
+.badge{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:600;border-radius:20px;padding:2px 10px}
+.badge-ok{color:#7ee787;background:rgba(63,185,80,.14);border:1px solid rgba(63,185,80,.35)}
+.badge-warn{color:#e3b341;background:rgba(210,153,34,.14);border:1px solid rgba(210,153,34,.4)}
+.badge-err{color:#ff8182;background:rgba(248,81,73,.14);border:1px solid rgba(248,81,73,.4)}
+.badge-info{color:#79c0ff;background:rgba(88,166,255,.14);border:1px solid rgba(88,166,255,.4)}
+
+/* ---------- Toast ---------- */
+#toasts{position:fixed;right:22px;bottom:22px;z-index:99;display:flex;flex-direction:column;gap:10px}
+.toast{
+  display:flex;align-items:center;gap:9px;
+  background:var(--bg3);border:1px solid var(--rule);
+  border-left:3px solid var(--accent);
+  border-radius:10px;padding:11px 16px;min-width:240px;
+  box-shadow:var(--shadow);font-size:13px;
+  animation:toastIn .28s cubic-bezier(.2,.7,.3,1);
+}
+.toast.ok{border-left-color:var(--ok)}
+.toast.err{border-left-color:var(--err)}
+@keyframes toastIn{from{opacity:0;transform:translateX(24px)}to{opacity:1;transform:none}}
+.toast.hide{opacity:0;transform:translateX(24px);transition:all .3s}
+
+/* ---------- Loading ---------- */
+.loading-wrap{position:relative}
+.loading-mask{
+  position:absolute;inset:0;z-index:5;
+  background:rgba(13,17,23,.72);backdrop-filter:blur(2px);
+  display:none;align-items:center;justify-content:center;flex-direction:column;gap:14px;
+  border-radius:var(--radius);
+}
+.loading-wrap.loading .loading-mask{display:flex}
+.spinner{
+  width:38px;height:38px;border-radius:50%;
+  border:3px solid var(--rule);border-top-color:var(--accent);
+  animation:spin .8s linear infinite;
+}
+@keyframes spin{to{transform:rotate(360deg)}}
+.loading-mask p{font-size:13px;color:var(--muted)}
+/* ---------- 表单类 ---------- */
+input[type=text],select,textarea{
+  background:var(--bg);color:var(--ink);
+  border:1px solid var(--rule);border-radius:8px;
+  padding:7px 12px;font-family:var(--sans);font-size:13px;outline:none;
+  transition:border-color .18s,box-shadow .18s;
+}
+input[type=text]:focus,select:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(88,166,255,.18)}
+select{cursor:pointer}
+
+/* ---------- 数据表格 ---------- */
+.tbl{width:100%;border-collapse:collapse;font-size:13px}
+.tbl th{
+  text-align:left;font-size:11.5px;letter-spacing:.8px;text-transform:uppercase;
+  color:var(--muted);font-weight:600;
+  padding:10px 14px;border-bottom:1px solid var(--rule);
+  background:var(--bg);position:sticky;top:0;z-index:1;
+}
+.tbl td{padding:9px 14px;border-bottom:1px solid #21262d;white-space:nowrap}
+.tbl tbody tr{transition:background .12s;cursor:default}
+.tbl tbody tr:hover{background:rgba(88,166,255,.06)}
+.tbl td.num{font-family:var(--mono);font-size:12.5px}
+.tag-dept{display:inline-block;font-size:11.5px;padding:1px 9px;border-radius:20px;font-weight:500}
+.tag-dept.d1{color:#79c0ff;background:rgba(88,166,255,.13)}
+.tag-dept.d2{color:#7ee787;background:rgba(63,185,80,.13)}
+.tag-dept.d3{color:#d2a8ff;background:rgba(188,140,255,.13)}
+.tag-dept.d4{color:#ffa657;background:rgba(240,136,62,.13)}
+
+/* ---------- 分页 ---------- */
+.pager{display:flex;align-items:center;gap:6px;padding:12px 18px;border-top:1px solid var(--rule)}
+.pager .info{font-size:12px;color:var(--muted);margin-right:auto}
+.pg-btn{
+  min-width:30px;height:30px;border-radius:7px;
+  border:1px solid var(--rule);background:var(--bg3);color:var(--muted);
+  font-family:var(--mono);font-size:12.5px;cursor:pointer;
+  transition:all .15s;padding:0 8px;
+}
+.pg-btn:hover:not(:disabled){color:var(--ink);border-color:#4d545d}
+.pg-btn.active{background:var(--grad);color:#fff;border:none;font-weight:700}
+.pg-btn:disabled{opacity:.4;cursor:not-allowed}
+
+/* ---------- SQL 编辑器 ---------- */
+.sql-editor{
+  position:relative;border-radius:10px;overflow:hidden;
+  border:1px solid var(--rule);background:#0a0d12;
+}
+.sql-editor:focus-within{border-color:var(--accent);box-shadow:0 0 0 3px rgba(88,166,255,.15)}
+.editor-gutter{position:absolute;left:0;top:0;bottom:0;width:44px;background:rgba(255,255,255,.02);border-right:1px solid #1a1f27;padding:14px 0;text-align:right;font-family:var(--mono);font-size:13px;line-height:1.55;color:#484f58;user-select:none;overflow:hidden}
+.editor-area{
+  width:100%;border:none;outline:none;resize:none;
+  background:transparent;color:#c9d1d9;
+  font-family:var(--mono);font-size:13px;line-height:1.55;
+  padding:14px 16px 14px 56px;min-height:190px;
+  caret-color:var(--accent);tab-size:2;
+  white-space:pre;overflow-wrap:normal;overflow-x:auto;
+}
+.hl-layer{
+  position:absolute;left:56px;right:16px;top:14px;
+  font-family:var(--mono);font-size:13px;line-height:1.55;
+  white-space:pre;pointer-events:none;
+  overflow:hidden;color:transparent;
+}
+.hl-layer .kw{color:#ff7b72;font-weight:600}
+.hl-layer .str{color:#a5d6ff}
+.hl-layer .cmt{color:#8b949e;font-style:italic}
+.hl-layer .fn{color:#d2a8ff}
+.hl-layer .num{color:#79c0ff}
+.editor-foot{display:flex;align-items:center;gap:14px;padding:8px 14px;border-top:1px solid var(--rule);background:var(--bg2)}
+.editor-foot .hint{font-size:11.5px;color:var(--muted);font-family:var(--mono)}
+.editor-foot .right{margin-left:auto;display:flex;gap:8px;align-items:center}
+.cursor-pos{font-family:var(--mono);font-size:11px;color:var(--muted)}
+
+/* ---------- EXPLAIN 计划 ---------- */
+.plan-flow{display:flex;flex-direction:column;gap:0;align-items:stretch}
+.plan-node{
+  border:1px solid var(--rule);border-radius:10px;
+  background:var(--bg);padding:11px 15px;
+  display:flex;align-items:center;gap:12px;flex-wrap:wrap;
+  transition:border-color .18s,box-shadow .18s;
+  position:relative;
+}
+.plan-node:hover{border-color:var(--accent);box-shadow:0 0 0 3px rgba(88,166,255,.1)}
+.plan-node.hot{border-color:var(--warn);background:rgba(210,153,34,.06)}
+.plan-node.hot:hover{box-shadow:0 0 0 3px rgba(210,153,34,.12)}
+.plan-badge{
+  font-family:var(--mono);font-size:10.5px;font-weight:700;
+  padding:2px 8px;border-radius:6px;letter-spacing:.5px;
+}
+.pb-seq{background:rgba(88,166,255,.15);color:#79c0ff}
+.pb-warn{background:rgba(210,153,34,.18);color:#e3b341}
+.plan-title{font-family:var(--mono);font-size:13px;font-weight:600}
+.plan-desc{font-size:12px;color:var(--muted)}
+.plan-metrics{margin-left:auto;display:flex;gap:14px;font-family:var(--mono);font-size:11.5px;color:var(--muted)}
+.plan-metrics b{color:var(--ink)}
+.plan-bar{height:6px;border-radius:3px;background:var(--bg3);overflow:hidden;flex-basis:100%;margin-top:8px}
+.plan-bar i{display:block;height:100%;border-radius:3px;background:var(--grad);width:0;transition:width .8s cubic-bezier(.2,.7,.3,1)}
+.plan-bar i.warnbar{background:linear-gradient(90deg,#d29922,#f0883e)}
+.plan-arrow{align-self:center;color:var(--muted);padding:5px 0;animation:bob 1.8s ease-in-out infinite}
+@keyframes bob{50%{transform:translateY(3px)}}
+.cost-chips{display:flex;gap:10px;flex-wrap:wrap}
+.cost-chip{
+  flex:1;min-width:150px;border:1px solid var(--rule);border-radius:10px;
+  background:var(--bg);padding:12px 16px;text-align:center;
+}
+.cost-chip .v{font-family:var(--mono);font-size:20px;font-weight:700;color:var(--accent)}
+.cost-chip .v.warnv{color:#e3b341}
+.cost-chip .k{font-size:11.5px;color:var(--muted);margin-top:2px}
+
+/* ---------- 规则校验 ---------- */
+.issue{
+  display:flex;gap:12px;padding:13px 16px;
+  border:1px solid var(--rule);border-radius:10px;background:var(--bg);
+  animation:fadeUp .3s both;
+}
+.issue + .issue{margin-top:10px}
+.issue:hover{border-color:#4d545d}
+.lvl{
+  flex-shrink:0;width:52px;height:22px;border-radius:6px;
+  display:inline-flex;align-items:center;justify-content:center;
+  font-family:var(--mono);font-size:10.5px;font-weight:800;letter-spacing:.5px;
+}
+.lvl-error{background:rgba(248,81,73,.16);color:#ff8182;border:1px solid rgba(248,81,73,.4)}
+.lvl-warning{background:rgba(210,153,34,.16);color:#e3b341;border:1px solid rgba(210,153,34,.4)}
+.lvl-info{background:rgba(88,166,255,.16);color:#79c0ff;border:1px solid rgba(88,166,255,.4)}
+.issue-body{flex:1;min-width:0}
+.issue-title{font-size:13.5px;font-weight:600;margin-bottom:3px}
+.issue-desc{font-size:12.5px;color:var(--muted);line-height:1.55}
+.issue-fix{
+  margin-top:8px;padding:9px 12px;border-radius:8px;
+  background:rgba(63,185,80,.07);border:1px dashed rgba(63,185,80,.35);
+  font-size:12.5px;color:#7ee787;
+  display:flex;gap:7px;align-items:flex-start;
+}
+.issue-fix .fix-label{flex-shrink:0;font-weight:700;font-size:11px;letter-spacing:1px;margin-top:1px}
+.issue-fix code{font-family:var(--mono);font-size:12px;word-break:break-all}
+.issue-loc{margin-left:auto;flex-shrink:0;font-family:var(--mono);font-size:11px;color:var(--muted)}
+
+/* ---------- 图表容器 ---------- */
+.chart{width:100%;height:300px}
+.chart-sm{width:100%;height:250px}
+
+/* ---------- 时间线（历史） ---------- */
+.tl{position:relative;padding-left:24px}
+.tl::before{content:'';position:absolute;left:7px;top:6px;bottom:6px;width:2px;background:var(--rule)}
+.tl-item{position:relative;padding:12px 0 6px}
+.tl-item::before{
+  content:'';position:absolute;left:-22px;top:20px;
+  width:10px;height:10px;border-radius:50%;
+  background:var(--bg);border:2px solid var(--accent);
+}
+.tl-item.warn::before{border-color:var(--warn)}
+.tl-item.err::before{border-color:var(--err)}
+.tl-item.ok::before{border-color:var(--ok)}
+.tl-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.tl-sql{
+  font-family:var(--mono);font-size:12px;color:#c9d1d9;
+  background:var(--bg);border:1px solid var(--rule);border-radius:8px;
+  padding:8px 12px;margin-top:7px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;
+  transition:border-color .15s,color .15s;
+}
+.tl-sql:hover{border-color:var(--accent);color:#fff}
+.tl-meta{font-size:11.5px;color:var(--muted);font-family:var(--mono);display:flex;gap:14px;margin-top:5px;flex-wrap:wrap}
+.tl-meta b{color:var(--ink);font-weight:600}
+
+/* ---------- 空状态 ---------- */
+.empty{
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  padding:52px 20px;color:var(--muted);text-align:center;
+}
+.empty svg{width:44px;height:44px;opacity:.45;margin-bottom:12px}
+.empty p{font-size:13px}
+.empty .btn{margin-top:16px}
+
+/* ---------- 工具提示 ---------- */
+.tooltip{position:fixed;z-index:100;pointer-events:none;max-width:280px}
+
+/* ---------- 响应式 ---------- */
+@media (max-width:920px){
+  body{overflow:auto}
+  .app{flex-direction:column;height:auto}
+  .sidebar{width:100%;flex-direction:row;align-items:center;flex-wrap:wrap}
+  .menu{display:flex;flex-wrap:wrap;padding:8px}
+  .conn{display:none}
+  .main{min-height:100vh}
+}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- ================= 侧边栏 ================= -->
+  <aside class="sidebar">
+    <div class="logo">
+      <div class="logo-icon">Q</div>
+      <div>
+        <div class="logo-text">SQLab <em>Pro</em></div>
+        <div class="logo-sub">SQL TESTING BENCH</div>
+      </div>
+    </div>
+
+    <nav class="menu">
+      <div class="menu-label">工作台</div>
+      <div class="menu-item active" data-view="query" data-crumb="SQL 查询">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+        SQL 查询<span class="kbd">1</span>
+      </div>
+      <div class="menu-item" data-view="explain" data-crumb="性能分析">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+        性能分析<span class="kbd">2</span>
+      </div>
+      <div class="menu-item" data-view="lint" data-crumb="规范检查">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg>
+        规范检查<span class="kbd">3</span>
+      </div>
+      <div class="menu-item" data-view="history" data-crumb="历史记录">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        历史记录<span class="kbd">4</span>
+      </div>
+    </nav>
+
+    <div class="conn">
+      <div class="conn-row"><span class="dot"></span><b>prod-pg-main</b></div>
+      <span>PostgreSQL 15.4 · 10.2.1.8:5432</span>
+      <span class="tag">READ-ONLY 只读连接</span>
+    </div>
+  </aside>
+
+  <!-- ================= 主区域 ================= -->
+  <div class="main">
+    <header class="topbar">
+      <div class="crumb">SQLab Pro /<b id="crumb">SQL 查询</b></div>
+      <div class="topbar-right">
+        <span class="pill"><span class="dot"></span>连接正常 · 延迟 <b style="color:var(--ink);font-family:var(--mono);margin-left:4px">12ms</b></span>
+        <span class="pill">v0.9.2-beta</span>
+        <div class="avatar">YH</div>
+      </div>
+    </header>
+
+    <main class="content">
+
+      <!-- ============ 视图 1：SQL 查询 ============ -->
+      <section class="view active" id="view-query">
+        <div class="card">
+          <div class="card-head">
+            <h3>查询编辑器</h3>
+            <span class="sub">employee_db · public</span>
+            <span class="spacer"></span>
+            <select id="dsSelect" title="数据源">
+              <option>prod-pg-main（只读）</option>
+              <option>staging-pg（只读）</option>
+              <option>dev-pg-local</option>
+            </select>
+          </div>
+          <div class="card-body">
+            <div class="sql-editor">
+              <div class="editor-gutter" id="gutter">1</div>
+              <div class="hl-layer" id="hl"></div>
+              <textarea class="editor-area" id="sqlInput" spellcheck="false" rows="8">SELECT id, name, dept, op_time
+FROM employee
+WHERE dept = '研发部';</textarea>
+            </div>
+            <div class="editor-foot">
+              <span class="hint">Ctrl + Enter 执行</span>
+              <span class="cursor-pos" id="curPos">Ln 3, Col 23</span>
+              <div class="right">
+                <button class="btn btn-ghost" id="btnFormat" title="格式化 SQL">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M4 12h10M4 18h7"/></svg>格式化
+                </button>
+                <button class="btn btn-ghost" id="btnExplainJump" title="发送到性能分析">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>性能分析
+                </button>
+                <button class="btn btn-primary" id="btnRun">
+                  <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+                  <span id="btnRunText">执行查询</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card loading-wrap" id="resultCard">
+          <div class="loading-mask">
+            <div class="spinner"></div>
+            <p>正在执行查询，正在从 prod-pg-main 拉取数据…</p>
+          </div>
+          <div class="card-head">
+            <h3>执行结果</h3>
+            <span class="badge badge-ok" id="resStatus">成功</span>
+            <span class="sub" id="resMeta">50 rows · 128 ms</span>
+            <span class="spacer"></span>
+            <button class="btn btn-ghost" id="btnExport">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              导出 CSV
+            </button>
+          </div>
+          <div style="overflow:auto;max-height:430px">
+            <table class="tbl" id="resTable">
+              <thead><tr><th>ID</th><th>姓名</th><th>部门</th><th>操作时间</th></tr></thead>
+              <tbody id="resBody"></tbody>
+            </table>
+          </div>
+          <div class="pager" id="pager"></div>
+        </div>
+      </section>
+
+      <!-- ============ 视图 2：性能分析 ============ -->
+      <section class="view" id="view-explain">
+        <div class="card loading-wrap" id="explainCard">
+          <div class="loading-mask">
+            <div class="spinner"></div>
+            <p>EXPLAIN ANALYZE 执行中，正在采集真实运行时指标…</p>
+          </div>
+          <div class="card-head">
+            <h3>执行计划（EXPLAIN ANALYZE）</h3>
+            <span class="badge badge-err" id="planVerdict">发现性能风险</span>
+            <span class="spacer"></span>
+            <button class="btn btn-ghost" id="btnExplainRun">
+              <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>重新分析
+            </button>
+          </div>
+          <div class="card-body">
+            <div class="cost-chips" style="margin-bottom:16px">
+              <div class="cost-chip"><div class="v" id="costTotal">3,142</div><div class="k">总成本 cost</div></div>
+              <div class="cost-chip"><div class="v warnv" id="costRows">98,420</div><div class="k">扫描行数</div></div>
+              <div class="cost-chip"><div class="v" id="costTime">412.6 ms</div><div class="k">实际耗时</div></div>
+              <div class="cost-chip"><div class="v warnv" id="costBuf">24.3 MB</div><div class="k">缓冲区占用</div></div>
+            </div>
+            <div class="plan-flow" id="planFlow"><!-- JS 渲染 --></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-head">
+            <h3>慢查询分析</h3>
+            <span class="sub">最近 100 次执行采样</span>
+            <span class="spacer"></span>
+            <select id="slowRange"><option>最近 1 小时</option><option selected>最近 24 小时</option><option>最近 7 天</option></select>
+          </div>
+          <div class="card-body">
+            <div class="chart" id="slowChart"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ 视图 3：规范检查 ============ -->
+      <section class="view" id="view-lint">
+        <div class="card">
+          <div class="card-head">
+            <h3>待检查 SQL</h3>
+            <span class="sub">与「SQL 查询」编辑器内容实时同步</span>
+            <span class="spacer"></span>
+            <button class="btn btn-ghost" id="btnLoadSample2">载入问题样例</button>
+            <button class="btn btn-primary" id="btnLintRun">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+              <span id="btnLintText">立即检查</span>
+            </button>
+          </div>
+          <div class="card-body">
+            <div class="sql-editor" style="min-height:120px">
+              <div class="editor-gutter" id="gutter2">1</div>
+              <div class="hl-layer" id="hl2"></div>
+              <textarea class="editor-area" id="sqlInput2" spellcheck="false" rows="5" style="min-height:120px"></textarea>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-head">
+            <h3>检查结果</h3>
+            <span class="badge badge-err" id="lintSummary">2 Error · 1 Warning · 1 Info</span>
+            <span class="spacer"></span>
+            <label style="font-size:12.5px;color:var(--muted);display:flex;align-items:center;gap:6px">
+              <input type="checkbox" id="lintOnlyErr" style="accent-color:#58a6ff;cursor:pointer">仅看 Error
+            </label>
+          </div>
+          <div class="card-body" id="issueList"><!-- JS 渲染 --></div>
+        </div>
+
+        <div class="card">
+          <div class="card-head"><h3>规则集</h3><span class="sub">内置 5 条默认规则，可按团队规范扩展</span></div>
+          <div style="overflow:auto">
+            <table class="tbl">
+              <thead><tr><th>规则</th><th>级别</th><th>说明</th></tr></thead>
+              <tbody>
+                <tr><td><code style="font-family:var(--mono);color:#ff7b72">no-select-star</code></td><td><span class="badge badge-err">Error</span></td><td style="color:var(--muted)">禁止 SELECT *，需显式列出字段</td></tr>
+                <tr><td><code style="font-family:var(--mono);color:#ff7b72">require-where</code></td><td><span class="badge badge-err">Error</span></td><td style="color:var(--muted)">DELETE / UPDATE 必须携带 WHERE 条件</td></tr>
+                <tr><td><code style="font-family:var(--mono);color:#e3b341">limit-rows</code></td><td><span class="badge badge-warn">Warning</span></td><td style="color:var(--muted)">无 LIMIT 的大表全量查询将被拦截提示</td></tr>
+                <tr><td><code style="font-family:var(--mono);color:#e3b341">index-hint</code></td><td><span class="badge badge-warn">Warning</span></td><td style="color:var(--muted)">大表过滤列缺少索引时给出提示</td></tr>
+                <tr><td><code style="font-family:var(--mono);color:#79c0ff">naming-style</code></td><td><span class="badge badge-info">Info</span></td><td style="color:var(--muted)">字段命名建议使用 snake_case 风格</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ 视图 4：历史记录 ============ -->
+      <section class="view" id="view-history">
+        <div class="card">
+          <div class="card-head">
+            <h3>执行历史</h3>
+            <span class="sub" id="histCount">共 6 条</span>
+            <span class="spacer"></span>
+            <select id="histFilter">
+              <option value="all">全部状态</option>
+              <option value="ok">成功</option>
+              <option value="warn">警告</option>
+              <option value="err">失败</option>
+            </select>
+            <button class="btn btn-danger" id="btnClearHist">清空历史</button>
+          </div>
+          <div class="card-body">
+            <div class="tl" id="histList"><!-- JS 渲染 --></div>
+            <div class="empty" id="histEmpty" style="display:none">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+              <p>暂无匹配的执行记录</p>
+              <button class="btn btn-ghost" onclick="switchView('query')">去执行一条 SQL</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+</div>
+
+<div id="toasts"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+<script>
+/* ================================================================
+   SQLab Pro 原型脚本：全部为本地 Mock 数据，无任何后端依赖
+================================================================ */
+'use strict';
+const $  = (s, el=document) => el.querySelector(s);
+const $$ = (s, el=document) => Array.from(el.querySelectorAll(s));
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+/* ---------- Toast ---------- */
+function toast(msg, type=''){
+  const box = $('#toasts');
+  const t = document.createElement('div');
+  t.className = 'toast ' + type;
+  t.innerHTML = (type==='ok'?'✅ ':type==='err'?'⛔ ':'💡 ') + msg;
+  box.appendChild(t);
+  setTimeout(()=>{ t.classList.add('hide'); setTimeout(()=>t.remove(), 320); }, 2600);
+}
+
+/* ---------- 视图切换（SPA） ---------- */
+function switchView(name){
+  $$('.menu-item').forEach(m => m.classList.toggle('active', m.dataset.view===name));
+  $$('.view').forEach(v => v.classList.toggle('active', v.id === 'view-'+name));
+  const item = $('.menu-item[data-view="'+name+'"]');
+  $('#crumb').textContent = item ? item.dataset.crumb : '';
+  if(name==='explain' && !explainRendered) runExplain();
+  if(name==='lint' && !lintRendered) runLint(true);
+  if(name==='history') renderHistory();
+  if(name==='explain') setTimeout(initSlowChart, 60);
+}
+$$('.menu-item').forEach(m => m.addEventListener('click', () => switchView(m.dataset.view)));
+document.addEventListener('keydown', e => {
+  if(e.ctrlKey || e.metaKey){
+    if(e.key==='Enter'){ e.preventDefault(); if(currentView()==='query') runQuery(); }
+    return;
+  }
+  const map = {'1':'query','2':'explain','3':'lint','4':'history'};
+  if(map[e.key] && document.activeElement.tagName !== 'TEXTAREA' && document.activeElement.tagName !== 'INPUT'){
+    switchView(map[e.key]);
+  }
+});
+const currentView = () => ($('.view.active')||{id:''}).id.replace('view-','');
+
+/* ================================================================
+   Mock 数据：50 行员工记录
+================================================================ */
+const DEPTS = ['研发部','产品部','市场部','人事部'];
+const SURNAMES = ['张','李','王','刘','陈','杨','黄','赵','周','吴','徐','孙','马','朱','胡','郭','何','林','罗','郑'];
+const GIVEN = ['伟','芳','娜','敏','静','磊','军','洋','勇','艳','杰','涛','明','超','秀英','霞','平','刚','桂英','文轩','雨欣','子豪','思远','梦琪'];
+function mulberry32(seed){
+  return function(){
+    seed |= 0; seed = seed + 0x6D2B79F5 | 0;
+    let t = Math.imul(seed ^ seed >>> 15, 1 | seed);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+const MOCK_ROWS = (() => {
+  const rnd = mulberry32(20240521);
+  const rows = [];
+  for(let i=1;i<=50;i++){
+    rows.push({
+      id: 1000 + i,
+      name: SURNAMES[Math.floor(rnd()*SURNAMES.length)] + GIVEN[Math.floor(rnd()*GIVEN.length)],
+      dept: DEPTS[Math.floor(rnd()*DEPTS.length)],
+      op_time: `2024-05-2${Math.floor(rnd()*9)} ${String(8+Math.floor(rnd()*10)).padStart(2,'0')}:${String(Math.floor(rnd()*60)).padStart(2,'0')}:${String(Math.floor(rnd()*60)).padStart(2,'0')}`
+    });
+  }
+  return rows;
+})();
+
+/* ================================================================
+   SQL 高亮（透明文字层方案）
+================================================================ */
+const KEYWORDS = /\b(SELECT|FROM|WHERE|AND|OR|ORDER|GROUP|BY|HAVING|LIMIT|OFFSET|INSERT|INTO|VALUES|UPDATE|SET|DELETE|JOIN|LEFT|RIGHT|INNER|OUTER|ON|AS|DISTINCT|COUNT|SUM|AVG|MAX|MIN|CREATE|TABLE|INDEX|EXPLAIN|ANALYZE|DESC|ASC|NOT|NULL|IN|BETWEEN|LIKE|IS)\b/gi;
+const FUNCS = /\b(coalesce|now|date_trunc|count|sum|avg|round|lower|upper|substring)\s*\(/gi;
+function escapeHtml(s){ return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function highlightSql(src){
+  let h = escapeHtml(src);
+  h = h.replace(/--[^\n]*/g, m => '\u0001' + m + '\u0002');          // 暂存注释
+  h = h.replace(/'(?:[^']|'')*'/g, m => '\u0003' + m + '\u0004');      // 暂存字符串
+  h = h.replace(KEYWORDS, m => '\u0005' + m + '\u0006');
+  h = h.replace(FUNCS, m => '\u0007' + m + '\u0008');
+  h = h.replace(/\b(\d+(?:\.\d+)?)\b/g, '\u0009$1\u000A');
+  h = h.replace(/\u0001([\s\S]*?)\u0002/g, '<span class="cmt">$1</span>')
+       .replace(/\u0003([\s\S]*?)\u0004/g, '<span class="str">$1</span>')
+       .replace(/\u0005([\s\S]*?)\u0006/g, '<span class="kw">$1</span>')
+       .replace(/\u0007([\s\S]*?)\u0008/g, '<span class="fn">$1</span>')
+       .replace(/\u0009([\s\S]*?)\u000A/g, '<span class="num">$1</span>');
+  return h + '\n';
+}
+function bindEditor(textareaId, hlId, gutterId, statusId){
+  const ta = $(textareaId), hl = $(hlId), gu = $(gutterId), st = $(statusId);
+  const sync = () => {
+    hl.innerHTML = highlightSql(ta.value) + '\n'.repeat(0);
+    const lines = ta.value.split('\n').length;
+    gu.textContent = Array.from({length:lines}, (_,i)=>i+1).join('\n');
+    const upto = ta.value.slice(0, ta.selectionStart).split('\n');
+    st.textContent = `Ln ${upto.length}, Col ${upto[upto.length-1].length + 1}`;
+  };
+  ta.addEventListener('input', sync);
+  ta.addEventListener('click', sync);
+  ta.addEventListener('keyup', sync);
+  ta.addEventListener('scroll', () => { hl.scrollTop = ta.scrollTop; });
+  ta.addEventListener('keydown', e => {           // Tab 插入两个空格
+    if(e.key==='Tab'){
+      e.preventDefault();
+      const s = ta.selectionStart, epos = ta.selectionEnd;
+      ta.value = ta.value.slice(0,s) + '  ' + ta.value.slice(epos);
+      ta.selectionStart = ta.selectionEnd = s + 2;
+      sync();
+    }
+  });
+  sync();
+  return sync;
+}
+const syncEditor1 = bindEditor('#sqlInput','#hl','#gutter','#curPos');
+const syncEditor2 = bindEditor('#sqlInput2','#hl2','#gutter2', null);
+$('#sqlInput').addEventListener('input', () => { $('#sqlInput2').value = $('#sqlInput').value; syncEditor2(); });
+
+/* ================================================================
+   模块 1：SQL 查询 + 分页结果
+================================================================ */
+const PAGE_SIZE = 10;
+let curPage = 1, lastRows = MOCK_ROWS, lastCostMs = 0;
+function renderPage(){
+  const start = (curPage-1)*PAGE_SIZE;
+  const rows = lastRows.slice(start, start+PAGE_SIZE);
+  $('#resBody').innerHTML = rows.map(r => `
+    <tr>
+      <td class="num">${r.id}</td>
+      <td>${r.name}</td>
+      <td><span class="tag-dept d${DEPTS.indexOf(r.dept)+1}">${r.dept}</span></td>
+      <td class="num" style="color:var(--muted)">${r.op_time}</td>
+    </tr>`).join('');
+  const totalPages = Math.ceil(lastRows.length/PAGE_SIZE);
+  let btns = `<button class="pg-btn" data-p="${curPage-1}" ${curPage===1?'disabled':''}>‹</button>`;
+  for(let p=1;p<=totalPages;p++) btns += `<button class="pg-btn ${p===curPage?'active':''}" data-p="${p}">${p}</button>`;
+  btns += `<button class="pg-btn" data-p="${curPage+1}" ${curPage===totalPages?'disabled':''}>›</button>`;
+  $('#pager').innerHTML = `<span class="info">共 ${lastRows.length} 条 / ${totalPages} 页 · 每页 ${PAGE_SIZE} 条 · 耗时 ${lastCostMs} ms</span>${btns}`;
+  $$('#pager .pg-btn').forEach(b => b.addEventListener('click', () => { curPage = +b.dataset.p; renderPage(); }));
+}
+async function runQuery(){
+  const btn = $('#btnRun'), txt = $('#btnRunText');
+  btn.disabled = true; txt.textContent = '执行中…';
+  $('#resultCard').classList.add('loading');
+  $('#resStatus').className = 'badge badge-info'; $('#resStatus').textContent = '执行中';
+  const t0 = performance.now();
+  await sleep(1000);                               // 模拟 1s 网络与执行延迟
+  lastCostMs = 118 + Math.floor(Math.random()*60);
+  lastRows = MOCK_ROWS;
+  curPage = 1;
+  renderPage();
+  $('#resultCard').classList.remove('loading');
+  $('#resStatus').className = 'badge badge-ok'; $('#resStatus').textContent = '成功';
+  $('#resMeta').textContent = `${lastRows.length} rows · ${lastCostMs} ms`;
+  btn.disabled = false; txt.textContent = '执行查询';
+  pushHistory('ok', $('#sqlInput').value.trim().replace(/\s+/g,' '), lastRows.length, lastCostMs);
+  toast(`查询完成，返回 ${lastRows.length} 条记录（${lastCostMs}ms）`, 'ok');
+}
+$('#btnRun').addEventListener('click', runQuery);
+$('#btnFormat').addEventListener('click', () => {
+  const KWS = ['SELECT','FROM','WHERE','AND','ORDER BY','GROUP BY','LIMIT'];
+  let sql = $('#sqlInput').value.replace(/\s+/g,' ').trim();
+  KWS.forEach(k => { sql = sql.replace(new RegExp('\\s*'+k.replace(/ /g,'\\s+')+'\\s*','gi'), '\n'+k+' '); });
+  sql = sql.replace(/,(?![^(]*\))/g, ',\n       ').replace(/\n+/g,'\n');
+  $('#sqlInput').value = sql + ';';
+  $('#sqlInput2').value = $('#sqlInput').value; syncEditor2();
+  toast('SQL 已格式化');
+});
+$('#btnExport').addEventListener('click', () => {
+  const head = 'ID,姓名,部门,操作时间';
+  const body = lastRows.map(r => [r.id,r.name,r.dept,r.op_time].join(',')).join('\n');
+  const blob = new Blob(['\ufeff'+head+'\n'+body], {type:'text/csv;charset=utf-8'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = 'sqlab_export.csv'; a.click();
+  URL.revokeObjectURL(a.href);
+  toast('已导出 CSV（50 条）', 'ok');
+});
+$('#btnExplainJump').addEventListener('click', () => { switchView('explain'); toast('已发送至性能分析模块'); });
+
+/* ================================================================
+   模块 2：EXPLAIN 可视化 + 慢查询图表
+================================================================ */
+let explainRendered = false;
+const PLAN_NODES = [
+  { badge:'01', cls:'pb-seq',  title:'Limit',              desc:'rows=50 loops=1',                                 cost:8,  costText:'cost 0.15..3.12', rows:'rows 50', time:'0.2 ms' },
+  { badge:'02', cls:'pb-seq',  title:'Gather Merge',       desc:'workers=2 · 并行归并排序',                          cost:34, costText:'cost 3.14..2,201.6', rows:'rows 50', time:'12.4 ms' },
+  { badge:'03', cls:'pb-warn', title:'Seq Scan on employee', desc:'Filter: (dept = 研发部) · 全表扫描 98,420 行',     cost:92, costText:'cost 0.00..2,187.4', rows:'rows 98,420', time:'388.9 ms', hot:true }
+];
+function renderPlan(){
+  $('#planFlow').innerHTML = PLAN_NODES.map((n,i) => `
+    ${i>0?'<div class="plan-arrow">▼</div>':''}
+    <div class="plan-node ${n.hot?'hot':''}">
+      <span class="plan-badge ${n.cls}">${n.badge}</span>
+      <div>
+        <div class="plan-title">${n.title}</div>
+        <div class="plan-desc">${n.desc}</div>
+      </div>
+      <div class="plan-metrics"><span>${n.costText}</span><b>${n.time}</b></div>
+      <div class="plan-bar"><i class="${n.hot?'warnbar':''}" data-w="${n.cost}"></i></div>
+    </div>`).join('');
+  requestAnimationFrame(() => setTimeout(() => {
+    $$('#planFlow .plan-bar i').forEach(b => b.style.width = b.dataset.w + '%');
+  }, 80));
+}
+async function runExplain(){
+  const card = $('#explainCard');
+  card.classList.add('loading');
+  explainRendered = true;
+  await sleep(1100);
+  renderPlan();
+  card.classList.remove('loading');
+  toast('执行计划分析完成：检测到全表扫描 Seq Scan', 'err');
+}
+$('#btnExplainRun').addEventListener('click', runExplain);
+
+let slowChart = null;
+function initSlowChart(){
+  const el = $('#slowChart');
+  if(!el || !window.echarts) return;
+  if(slowChart) { slowChart.resize(); return; }
+  slowChart = echarts.init(el);
+  const hours = Array.from({length:24}, (_,i) => String(i).padStart(2,'0') + ':00');
+  const p95 = [120,98,86,80,76,90,140,260,412,385,360,342,298,276,310,295,268,240,210,198,185,172,158,134];
+  const cnt = [2,1,0,0,1,4,12,28,41,38,35,33,30,27,31,29,26,22,18,15,12,9,7,4];
+  slowChart.setOption({
+    backgroundColor:'transparent',
+    tooltip:{trigger:'axis',backgroundColor:'#1c2129',borderColor:'#30363d',textStyle:{color:'#e6edf3'}},
+    legend:{data:['P95 耗时 (ms)','执行次数'],textStyle:{color:'#8b949e'},top:0},
+    grid:{left:46,right:46,top:38,bottom:28},
+    xAxis:{type:'category',data:hours,axisLine:{lineStyle:{color:'#30363d'}},axisLabel:{color:'#8b949e'}},
+    yAxis:[
+      {type:'value',name:'ms',axisLabel:{color:'#8b949e'},splitLine:{lineStyle:{color:'#21262d'}}},
+      {type:'value',name:'次数',axisLabel:{color:'#8b949e'},splitLine:{show:false}}
+    ],
+    series:[
+      {name:'P95 耗时 (ms)',type:'bar',data:p95,barWidth:'55%',
+       itemStyle:{borderRadius:[5,5,0,0],color:new echarts.graphic.LinearGradient(0,0,0,1,[{offset:0,color:'#8957e5'},{offset:1,color:'#2f81f7'}])},
+       markLine:{silent:true,symbol:'none',lineStyle:{color:'#f85149',type:'dashed'},
+         label:{color:'#ff8182',formatter:'阈值 300ms'},data:[{yAxis:300}]}},
+      {name:'执行次数',type:'line',yAxisIndex:1,data:cnt,smooth:true,
+       itemStyle:{color:'#3fb950'},lineStyle:{width:2.5,color:'#3fb950'},
+       areaStyle:{color:new echarts.graphic.LinearGradient(0,0,0,1,[{offset:0,color:'rgba(63,185,80,.25)'},{offset:1,color:'rgba(63,185,80,0)'}])}}
+    ]
+  });
+  $('#slowRange').addEventListener('change', () => toast('已切换采样范围（Mock 数据不变）'));
+  window.addEventListener('resize', () => slowChart && slowChart.resize());
+}
+
+/* ================================================================
+   模块 3：规范检查
+================================================================ */
+let lintRendered = false;
+const ISSUES = [
+  { lvl:'ERROR',   cls:'lvl-error',   title:'禁止使用 SELECT *', rule:'no-select-star', loc:'Ln 1, Col 8',
+    desc:'SELECT * 会阻碍索引覆盖（Covering Index）优化，且表结构变更时可能引发字段错位。建议显式列出所需字段。',
+    fix:'SELECT id, name, dept, op_time, salary FROM employee;' },
+  { lvl:'WARNING', cls:'lvl-warning', title:'查询缺少 LIMIT 保护', rule:'limit-rows', loc:'Ln 1, Col 1',
+    desc:'employee 表约 98,000 行，无 LIMIT 的查询在大表上可能拖垮接口响应。建议追加 LIMIT 或分页。',
+    fix:'… ORDER BY id LIMIT 100;' },
+  { lvl:'WARNING', cls:'lvl-warning', title:'过滤列缺少可用索引', rule:'index-hint', loc:'Ln 2, Col 18',
+    desc:'字段 op_time 用于范围过滤，但该列上未命中任何索引，预计触发全表扫描。建议评估创建 btree 索引。',
+    fix:'CREATE INDEX idx_employee_op_time ON employee (op_time);' },
+  { lvl:'INFO',    cls:'lvl-info',    title:'命名风格建议', rule:'naming-style', loc:'Ln 3, Col 7',
+    desc:'别名 "OpTime" 建议统一为 snake_case 风格（op_time），与团队 SQL 规范保持一致。',
+    fix:'SELECT op_time AS "op_time_alias" … 或直接使用原始列名。' }
+];
+function renderIssues(){
+  const onlyErr = $('#lintOnlyErr').checked;
+  const list = ISSUES.filter(i => !onlyErr || i.lvl==='ERROR');
+  $('#issueList').innerHTML = list.map((i,idx) => `
+    <div class="issue" style="animation-delay:${idx*70}ms">
+      <span class="lvl ${i.cls}">${i.lvl}</span>
+      <div class="issue-body">
+        <div class="issue-title">${i.title}</div>
+        <div class="issue-desc">${i.desc}</div>
+        <div class="issue-fix"><span class="fix-label">建议修复</span><code>${escapeHtml(i.fix)}</code></div>
+      </div>
+      <span class="issue-loc">${i.rule}<br>${i.loc}</span>
+    </div>`).join('') || '<div class="empty"><p>未发现违规项</p></div>';
+}
+async function runLint(silent){
+  const btn = $('#btnLintRun'), txt = $('#btnLintText');
+  btn.disabled = true; txt.textContent = '检查中…';
+  lintRendered = true;
+  await sleep(900);
+  renderIssues();
+  btn.disabled = false; txt.textContent = '立即检查';
+  if(!silent) toast('检查完成：2 Error · 2 Warning', 'err');
+  pushHistory('warn', $('#sqlInput2').value.trim().replace(/\s+/g,' '), null, 42);
+}
+$('#btnLintRun').addEventListener('click', () => runLint(false));
+$('#lintOnlyErr').addEventListener('change', renderIssues);
+$('#btnLoadSample2').addEventListener('click', () => {
+  $('#sqlInput2').value = "SELECT * FROM employee\nWHERE op_time > '2024-01-01'\nORDER BY OpTime;";
+  syncEditor2();
+  toast('已载入问题样例，点击「立即检查」');
+});
+
+/* ================================================================
+   历史记录
+================================================================ */
+let HISTORY = [
+  { t:'2024-05-21 14:32:08', st:'warn', label:'Warning', sql:'SELECT id, name, salary FROM employee ORDER BY salary DESC;', rows:'1024', ms:'356', memo:'缺少 LIMIT · 大表扫描' },
+  { t:'2024-05-21 14:28:51', st:'ok',   label:'成功',    sql:"SELECT * FROM orders o JOIN users u ON o.uid = u.id WHERE o.status = 'PAID';", rows:'12,048', ms:'842', memo:'JOIN + 全量返回' },
+  { t:'2024-05-21 13:55:12', st:'err',  label:'失败',    sql:'UPDATE employee SET salary = salary * 1.2;', rows:'-', ms:'3', memo:'只读连接拒绝 DML · 风险拦截' },
+  { t:'2024-05-21 11:20:44', st:'ok',   label:'成功',    sql:'SELECT dept, count(*) FROM employee GROUP BY dept;', rows:'4', ms:'46', memo:'聚合查询' },
+  { t:'2024-05-21 10:02:19', st:'warn', label:'Warning', sql:'SELECT * FROM big_log WHERE created_at > now() - interval \'7 days\';', rows:'86,532', ms:'1,204', memo:'SELECT * + 无 LIMIT' },
+  { t:'2024-05-20 18:47:03', st:'ok',   label:'成功',    sql:'SELECT id, name FROM employee WHERE dept = \'研发部\';', rows:'50', ms:'128', memo:'默认样例查询' }
+];
+function pushHistory(st, sql, rows, ms){
+  const now = new Date();
+  const pad = n => String(n).padStart(2,'0');
+  HISTORY.unshift({
+    t:`${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`,
+    st, label: st==='ok'?'成功':st==='warn'?'Warning':'失败',
+    sql, rows: rows===null?'-':String(rows), ms:String(ms),
+    memo: st==='ok'?'本次会话执行':st==='warn'?'规范检查发现风险':'执行失败'
+  });
+  if(HISTORY.length > 30) HISTORY.pop();
+}
+function renderHistory(){
+  const filter = $('#histFilter').value;
+  const list = HISTORY.filter(h => filter==='all' || h.st===filter);
+  $('#histCount').textContent = `共 ${list.length} 条`;
+  $('#histEmpty').style.display = list.length ? 'none' : 'flex';
+  $('#histList').innerHTML = list.map(h => `
+    <div class="tl-item ${h.st}">
+      <div class="tl-head">
+        <span class="badge badge-${h.st==='ok'?'ok':h.st==='warn'?'warn':'err'}">${h.label}</span>
+        <span style="font-size:12px;color:var(--muted);font-family:var(--mono)">${h.t}</span>
+      </div>
+      <div class="tl-sql" title="点击复制 SQL" data-sql="${escapeHtml(h.sql)}">${escapeHtml(h.sql)}</div>
+      <div class="tl-meta"><span>返回 <b>${h.rows}</b> 行</span><span>耗时 <b>${h.ms} ms</b></span><span>${h.memo}</span></div>
+    </div>`).join('');
+  $$('#histList .tl-sql').forEach(el => el.addEventListener('click', () => {
+    navigator.clipboard && navigator.clipboard.writeText(el.dataset.sql);
+    toast('SQL 已复制到剪贴板', 'ok');
+  }));
+}
+$('#histFilter').addEventListener('change', renderHistory);
+$('#btnClearHist').addEventListener('click', () => {
+  HISTORY = []; renderHistory(); toast('历史记录已清空');
+});
+
+/* ---------- 初始化 ---------- */
+renderPage();
+switchView('query');
+setTimeout(() => toast('原型已就绪：数据为本地 Mock，可自由交互', 'ok'), 600);
+</script>
+</body>
+</html>
